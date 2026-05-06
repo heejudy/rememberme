@@ -20,11 +20,12 @@ spec:
         image: dndzhr/backend:5.0
         env:
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:mariadb://mariadb-deploy:3306/rememberv1" # DB 서비스 이름과 포트 확인
+          # 아래 주소의 mariadb-deploy를 mariadb-service로 변경했습니다.
+          value: "jdbc:mariadb://mariadb-service:3306/rememberv1" 
         - name: SPRING_DATASOURCE_USERNAME
-          value: "root" # 실제 DB 사용자명
+          value: "root"
         - name: SPRING_DATASOURCE_PASSWORD
-          value: "0000" # 실제 DB 비밀번호
+          value: "0000"
         resources:
           requests:
             memory: "128Mi"
@@ -34,24 +35,18 @@ spec:
             cpu: "1000m"
         ports:
         - containerPort: 8085
-        # 컨테이너 안의 애플리케이션이 시작되었는지 확인한다.
         startupProbe:
           httpGet:
             path: /actuator/health
             port: 8085
-          # 실패를 허용하는 최대 횟수
           failureThreshold: 10
-          # 재요청 주기(10초마다 상태를 확인)
           periodSeconds: 10
-        # 컨테이너 안의 애플리케이션이 살아있는지 지속적으로 확인한다.
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
             port: 8085
-          # 최초 지연 시간
           initialDelaySeconds: 10
           periodSeconds: 20
-        # 컨테이너 안의 애플리케이션이 실제로 서비스 요청에 응답할 수 있는지 확인한다.
         readinessProbe:
           httpGet:
             path: /actuator/health/readiness
