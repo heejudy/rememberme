@@ -7,8 +7,6 @@ metadata:
     app: frontend
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       app: frontend
@@ -19,7 +17,6 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: dndzhr/frontend:4.0
+          image: iiijong/frontend:34
           ports:
             - containerPort: 85
-              protocol: TCP

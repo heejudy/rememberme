@@ -58,7 +58,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/reissue",       // 토큰 재발급
                                 "/oauth2/**",                // OAuth2 리다이렉트 경로
                                 "/v3/api-docs/**",           // Swagger용
-                                "/swagger-ui/**"             // Swagger UI용
+                                "/swagger-ui/**",            // Swagger UI용
+                                "/actuator/health/**"        // Health check 용 (Kubernetes)
                         ).permitAll()
                         // 인증 필요
                         .requestMatchers(
