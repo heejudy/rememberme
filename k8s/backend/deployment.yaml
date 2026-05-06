@@ -18,38 +18,33 @@ spec:
       containers:
       - name: backend
         image: dndzhr/backend:5.0
-        env:
-        - name: SPRING_DATASOURCE_URL
-          # 아래 주소의 mariadb-deploy를 mariadb-service로 변경했습니다.
-          value: "jdbc:mariadb://mariadb-service:3306/rememberv1" 
-        - name: SPRING_DATASOURCE_USERNAME
-          value: "root"
-        - name: SPRING_DATASOURCE_PASSWORD
-          value: "0000"
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "500m"
-          limits:
-            memory: "256Mi"
-            cpu: "1000m"
         ports:
-        - containerPort: 8085
-        startupProbe:
+          - containerPort: 8085
+        envFrom:
+          - configMapRef:
+              name: backend-config
+          - secretRef:
+              name: backend-secret
+        readinessProbe:
           httpGet:
             path: /actuator/health
             port: 8085
-          failureThreshold: 10
+          initialDelaySeconds: 40
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
         livenessProbe:
           httpGet:
-            path: /actuator/health/liveness
+            path: /actuator/health
             port: 8085
-          initialDelaySeconds: 10
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 8085
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          initialDelaySeconds: 85
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

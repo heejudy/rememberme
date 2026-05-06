@@ -1,14 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: rememberme-backend
+  name: backend-app
   namespace: argocd
 spec:
   project: default
 
   source:
     repoURL: git@github.com:heejudy/rememberme.git
-    targetRevision: HEAD
+    targetRevision: main
     path: k8s/backend
 
   destination:

@@ -1,24 +1,9 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: mariadb-deploy
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mariadb
-  template:
-    metadata:
-      labels:
-        app: mariadb
-    spec:
-      containers:
-      - name: mariadb
-        image: mariadb:10.5
-        env:
-        - name: MYSQL_ROOT_PASSWORD
-          value: "0000"
-        - name: MYSQL_DATABASE
-          value: "rememberv1"
-        ports:
-        - containerPort: 3306
+  name: backend-config
+  namespace: default
+data:
+  SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb-service:3306/rememberv1
+  SPRING_DATASOURCE_USERNAME: rememberv1
+  SPRING_DATASOURCE_PASSWORD: "0000"
