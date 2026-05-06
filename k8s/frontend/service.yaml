@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-  namespace: rememberme
+  namespace: default
 spec:
   type: NodePort
   selector:
@@ -10,4 +10,3 @@ spec:
   ports:
     - port: 85
       targetPort: 85
-      nodePort: 30180
