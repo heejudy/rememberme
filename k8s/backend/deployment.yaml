@@ -34,27 +34,21 @@ spec:
             cpu: "1000m"
         ports:
         - containerPort: 8085
-        # 컨테이너 안의 애플리케이션이 시작되었는지 확인한다.
+        # TCP 연결로 애플리케이션 시작 확인
         startupProbe:
-          httpGet:
-            path: /actuator/health
+          tcpSocket:
             port: 8085
-          # 실패를 허용하는 최대 횟수
           failureThreshold: 10
-          # 재요청 주기(10초마다 상태를 확인)
           periodSeconds: 10
-        # 컨테이너 안의 애플리케이션이 살아있는지 지속적으로 확인한다.
+        # TCP 연결로 애플리케이션 상태 확인
         livenessProbe:
-          httpGet:
-            path: /actuator/health/liveness
+          tcpSocket:
             port: 8085
-          # 최초 지연 시간
           initialDelaySeconds: 10
           periodSeconds: 20
-        # 컨테이너 안의 애플리케이션이 실제로 서비스 요청에 응답할 수 있는지 확인한다.
+        # TCP 연결로 서비스 준비 확인
         readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
+          tcpSocket:
             port: 8085
           initialDelaySeconds: 5
           periodSeconds: 5
