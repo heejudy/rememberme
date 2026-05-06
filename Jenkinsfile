@@ -24,32 +24,44 @@ pipeline {
     }
 
     environment {
-        // 이미지 저장소 설정
         FRONT_IMAGE = 'dndzhr/frontend'
         BACK_IMAGE  = 'dndzhr/backend'
-        
-        // 젠킨스에 등록된 DockerHub 자격증명 ID
         DOCKER_CREDENTIALS_ID = 'dockerhub-access'
+        GIT_CREDENTIALS_ID    = 'git-access-token' 
+        GIT_REPO = 'https://github.com/heejudy/rememberme.git'
+        BRANCH = 'main'
     }
 
     stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: "${BRANCH}",
+                    credentialsId: "${GIT_CREDENTIALS_ID}",
+                    url: "${GIT_REPO}"
+            }
+        }
+
         stage('Detect Changes') {
             steps {
                 script {
-                    echo "변경된 폴더 확인 중..."
-                    // 변경된 파일 목록을 가져와서 환경 변수에 할당
+                    echo "변경된 파일 확인 중..."
+
                     def changedFiles = sh(
-                        script: 'git diff --name-only HEAD~1 HEAD',
+                        script: "git diff --name-only HEAD^ HEAD || true",
                         returnStdout: true
                     ).trim().split("\n")
 
                     env.BUILD_BACK  = changedFiles.any { it.startsWith("backend/") } ? "true" : "false"
                     env.BUILD_FRONT = changedFiles.any { it.startsWith("frontend/") } ? "true" : "false"
 
+                    echo "BACK: ${env.BUILD_BACK}"
+                    echo "FRONT: ${env.BUILD_FRONT}"
+
                     if (env.BUILD_FRONT == "false" && env.BUILD_BACK == "false") {
-                        echo "변경 사항이 없어 파이프라인을 종료합니다."
+                        echo "변경 없음 → 종료"
                         currentBuild.result = 'SUCCESS'
-                        return // 이후 스테이지 실행 방지
+                        return
                     }
                 }
             }
@@ -61,7 +73,6 @@ pipeline {
             }
             steps {
                 container('docker') {
-                    // DockerHub 로그인
                     withCredentials([usernamePassword(
                         credentialsId: DOCKER_CREDENTIALS_ID,
                         usernameVariable: 'DOCKER_USER',
@@ -80,12 +91,10 @@ pipeline {
             steps {
                 container('docker') {
                     script {
-                        // 빌드 번호를 태그로 사용 (예: v1, v2...)
                         def tag = env.BUILD_NUMBER
-                        
+
                         if (env.BUILD_FRONT == "true") {
                             dir('frontend') {
-                                echo "Frontend 이미지 빌드 및 푸시 중..."
                                 sh "docker build -t ${FRONT_IMAGE}:${tag} ."
                                 sh "docker push ${FRONT_IMAGE}:${tag}"
                             }
@@ -93,7 +102,6 @@ pipeline {
 
                         if (env.BUILD_BACK == "true") {
                             dir('backend') {
-                                echo "Backend 이미지 빌드 및 푸시 중..."
                                 sh "docker build -t ${BACK_IMAGE}:${tag} ."
                                 sh "docker push ${BACK_IMAGE}:${tag}"
                             }
@@ -102,14 +110,44 @@ pipeline {
                 }
             }
         }
+
+        stage('Update K8s YAML & Push') {
+            when { 
+                expression { env.BUILD_FRONT == "true" || env.BUILD_BACK == "true" } 
+            }
+            steps {
+                container('docker') {
+                    script {
+                        def tag = env.BUILD_NUMBER
+
+                        sh """
+                        git config user.email "jenkins@local"
+                        git config user.name "jenkins"
+
+                        if [ "${BUILD_BACK}" = "true" ]; then
+                          sed -i 's|image: dndzhr/backend:.*|image: dndzhr/backend:${tag}|' k8s/backend/deployment.yaml
+                        fi
+
+                        if [ "${BUILD_FRONT}" = "true" ]; then
+                          sed -i 's|image: dndzhr/frontend:.*|image: dndzhr/frontend:${tag}|' k8s/frontend/deployment.yaml
+                        fi
+
+                        git add .
+                        git commit -m "Update image tag to ${tag}" || echo "No changes"
+                        git push https://${GIT_CREDENTIALS_ID}@github.com/heejudy/rememberme.git HEAD:${BRANCH}
+                        """
+                    }
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo "빌드 및 이미지 업로드가 성공적으로 끝났습니다! (Tag: ${env.BUILD_NUMBER})"
+            echo "CI/CD 완료 (Tag: ${env.BUILD_NUMBER})"
         }
         failure {
-            echo "빌드 과정에서 에러가 발생했습니다."
+            echo "빌드 실패"
         }
     }
 }
