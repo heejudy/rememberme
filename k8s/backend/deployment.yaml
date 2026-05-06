@@ -7,6 +7,7 @@ metadata:
     app: backend
 spec:
   replicas: 1
+  revisionHistoryLimit: 3  # 오래된 ReplicaSet 자동 정리 (최근 3개 유지)
   selector:
     matchLabels:
       app: backend
@@ -23,19 +24,21 @@ spec:
         envFrom:
           - configMapRef:
               name: backend-config
+        # Readiness: 앱이 요청을 받을 준비가 되었는지 확인
         readinessProbe:
           httpGet:
-            path: /actuator/health
+            path: /actuator/health/readiness # 경로 세분화 권장
             port: 8085
-          initialDelaySeconds: 40
+          initialDelaySeconds: 20 # 조금 더 빠르게 투입하도록 수정
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 5
+        # Liveness: 앱이 살아있는지 확인 (죽었으면 재시작)
         livenessProbe:
           httpGet:
-            path: /actuator/health
+            path: /actuator/health/liveness # 경로 세분화 권장
             port: 8085
-          initialDelaySeconds: 85
+          initialDelaySeconds: 60 # Readiness보다 조금 뒤에 시작
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 5
