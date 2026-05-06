@@ -2,18 +2,20 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: rememberme-frontend
-  namespace: default
+  namespace: argocd 
 spec:
   project: default
 
   source:
     repoURL: git@github.com:heejudy/rememberme.git
-    targetRevision: HEAD
+    # HEAD 대신 실제 브랜치명인 main을 명시하는 것을 권장합니다.
+    targetRevision: main 
     path: k8s/frontend
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    # 실제 앱이 배포될 위치는 default가 맞습니다.
+    namespace: default 
 
   syncPolicy:
     automated:
