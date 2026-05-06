@@ -9,9 +9,8 @@ pipeline {
             spec:
               containers:
               - name: docker
-                image: docker:29.4.1-cli-alpine3.23
-                command:
-                - cat
+                image: docker:24.0.7-cli
+                command: ["cat"]
                 tty: true
                 volumeMounts:
                 - name: docker-socket
@@ -25,8 +24,11 @@ pipeline {
     }
 
     environment {
+        // 이미지 저장소 설정
         FRONT_IMAGE = 'dndzhr/frontend'
         BACK_IMAGE  = 'dndzhr/backend'
+        
+        // 젠킨스에 등록된 DockerHub 자격증명 ID
         DOCKER_CREDENTIALS_ID = 'dockerhub-access'
     }
 
@@ -34,7 +36,8 @@ pipeline {
         stage('Detect Changes') {
             steps {
                 script {
-                    echo "Checking changed files..."
+                    echo "변경된 폴더 확인 중..."
+                    // 변경된 파일 목록을 가져와서 환경 변수에 할당
                     def changedFiles = sh(
                         script: 'git diff --name-only HEAD~1 HEAD',
                         returnStdout: true
@@ -44,73 +47,55 @@ pipeline {
                     env.BUILD_FRONT = changedFiles.any { it.startsWith("frontend/") } ? "true" : "false"
 
                     if (env.BUILD_FRONT == "false" && env.BUILD_BACK == "false") {
-                        echo "No frontend or backend changes detected."
+                        echo "변경 사항이 없어 파이프라인을 종료합니다."
                         currentBuild.result = 'SUCCESS'
-                        return
+                        return // 이후 스테이지 실행 방지
                     }
                 }
             }
         }
 
-        stage('Frontend Build') {
-            when { expression { env.BUILD_FRONT == "true" } }
+        stage('Docker Login') {
+            when { 
+                expression { env.BUILD_FRONT == "true" || env.BUILD_BACK == "true" } 
+            }
             steps {
                 container('docker') {
-                    dir('frontend') {
-                        echo "Building frontend..."
-                        sh '''
-                            npm ci
-                            npm run build
-                        '''
+                    // DockerHub 로그인
+                    withCredentials([usernamePassword(
+                        credentialsId: DOCKER_CREDENTIALS_ID,
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                     }
                 }
             }
         }
 
-        stage('Backend Build') {
-            when { expression { env.BUILD_BACK == "true" } }
-            steps {
-                container('docker') {
-                    dir('backend') {
-                        echo "Packaging backend..."
-                        sh '''
-                            mvn -B clean package -DskipTests
-                        '''
-                    }
-                }
+        stage('Build & Push Images') {
+            when { 
+                expression { env.BUILD_FRONT == "true" || env.BUILD_BACK == "true" } 
             }
-        }
-
-        stage('Docker Build & Push') {
             steps {
                 container('docker') {
                     script {
+                        // 빌드 번호를 태그로 사용 (예: v1, v2...)
                         def tag = env.BUILD_NUMBER
-                        withCredentials([usernamePassword(
-                            credentialsId: DOCKER_CREDENTIALS_ID,
-                            usernameVariable: 'DOCKER_USERNAME',
-                            passwordVariable: 'DOCKER_PASSWORD'
-                        )]) {
-                            sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
-                        }
-
+                        
                         if (env.BUILD_FRONT == "true") {
                             dir('frontend') {
-                                sh """
-                                    echo "Building frontend Docker image..."
-                                    docker build --no-cache -t $FRONT_IMAGE:$tag .
-                                    docker push $FRONT_IMAGE:$tag
-                                """
+                                echo "Frontend 이미지 빌드 및 푸시 중..."
+                                sh "docker build -t ${FRONT_IMAGE}:${tag} ."
+                                sh "docker push ${FRONT_IMAGE}:${tag}"
                             }
                         }
 
                         if (env.BUILD_BACK == "true") {
                             dir('backend') {
-                                sh """
-                                    echo "Building backend Docker image..."
-                                    docker build --no-cache -t $BACK_IMAGE:$tag .
-                                    docker push $BACK_IMAGE:$tag
-                                """
+                                echo "Backend 이미지 빌드 및 푸시 중..."
+                                sh "docker build -t ${BACK_IMAGE}:${tag} ."
+                                sh "docker push ${BACK_IMAGE}:${tag}"
                             }
                         }
                     }
@@ -120,179 +105,11 @@ pipeline {
     }
 
     post {
-        always {
-            withCredentials([string(
-                credentialsId: DISCORD_WEBHOOK_CREDENTIALS_ID,
-                variable: 'DISCORD_WEBHOOK_URL'
-            )]) {
-                discordSend description: """
-                Fullstack CI/CD Build Summary
-
-                Result: ${currentBuild.currentResult}
-                Job: ${env.JOB_NAME}
-                Build: ${currentBuild.displayName}
-                Frontend Changed: ${env.BUILD_FRONT}
-                Backend Changed: ${env.BUILD_BACK}
-                Duration: ${(currentBuild.duration / 1000).intValue()}s
-                """,
-                result: currentBuild.currentResult,
-                title: "Fullstack CI/CD (GitOps Auto Deploy)",
-                webhookURL: "${DISCORD_WEBHOOK_URL}"
-            }
+        success {
+            echo "빌드 및 이미지 업로드가 성공적으로 끝났습니다! (Tag: ${env.BUILD_NUMBER})"
+        }
+        failure {
+            echo "빌드 과정에서 에러가 발생했습니다."
         }
     }
 }
-
-
-
-
-
-
-
-
-
-// pipeline {
-//     agent {
-//         kubernetes {
-//             yaml '''
-//             apiVersion: v1
-//             kind: Pod
-//             metadata:
-//               name: jenkins-agent
-//             spec:
-//               containers:
-//               - name: docker
-//                 image: docker:29.4.1-cli-alpine3.23
-//                 command:
-//                 - cat
-//                 tty: true
-//                 volumeMounts:
-//                 - mountPath: "/var/run/docker.sock"
-//                   name: docker-socket
-//               volumes:
-//               - name: docker-socket
-//                 hostPath:
-//                   path: "/var/run/docker.sock"
-//             '''
-//         }
-//     }
-
-//     environment {
-//         BACKEND_IMAGE_NAME = 'dndzhr/backend'
-//         FRONTEND_IMAGE_NAME = 'dndzhr/frontend'
-//         DOCKER_CREDENTIALS_ID = 'dockerhub-access'
-//     }
-
-//     stages {
-//         stage('Detect Changes') {
-//             steps {
-//                 script {
-//                     // 현재 커밋과 이전 커밋(HEAD~1) 간의 변경 파일을 가져온다.
-//                     def changedFiles = sh(script: 'git diff --name-only HEAD~1', returnStdout: true).trim().split("\n")
-
-//                     // 전체 배열을 줄바꿈으로 출력
-//                     echo "Changed files:\n${changedFiles.join('\n')}"
-                    
-//                     // 환경 변수 동적 설정
-//                     env.SHOULD_BUILD_BACKEND = changedFiles.any { it.startsWith("backend/") } ? "true" : "false"
-//                     env.SHOULD_BUILD_FRONTEND = changedFiles.any { it.startsWith("frontend/") } ? "true" : "false"
-
-//                     echo "SHOULD_BUILD_BACKEND : ${SHOULD_BUILD_BACKEND}"
-//                     echo "SHOULD_BUILD_FRONTEND : ${SHOULD_BUILD_FRONTEND}"
-//                 }
-//             }
-//         }
-
-//         stage('Docker Login') {
-//             when {
-//                 expression { 
-//                     return env.SHOULD_BUILD_BACKEND == "true" ||  env.SHOULD_BUILD_FRONTEND == "true"
-//                 }
-//             }
-
-//             steps {
-//                 container('docker') {
-//                     sh 'docker logout'
-
-//                     withCredentials([usernamePassword(
-//                         credentialsId: DOCKER_CREDENTIALS_ID,
-//                         usernameVariable: 'DOCKER_USERNAME',
-//                         passwordVariable: 'DOCKER_PASSWORD'
-//                     )]) {
-//                         sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
-//                     }
-//                 }
-//             }
-//         }
-
-//         stage('APP Image Build & Push') {
-//             when {
-//                 expression {
-//                     return env.SHOULD_BUILD_BACKEND == "true"
-//                 }
-//             }
-
-//             steps {
-//                 container('docker') {
-//                     dir('frontend') {
-//                         script {
-//                             def buildNumber = "${env.BUILD_NUMBER}"
-
-//                             withEnv(["DOCKER_IMAGE_VERSION=${buildNumber}"]) {
-//                                 sh 'docker -v'
-//                                 sh 'echo $APP_IMAGE_NAME:$DOCKER_IMAGE_VERSION'
-//                                 sh 'docker build --no-cache -t $APP_IMAGE_NAME:$DOCKER_IMAGE_VERSION ./'
-//                                 sh 'docker image inspect $APP_IMAGE_NAME:$DOCKER_IMAGE_VERSION'
-//                                 sh 'docker push $APP_IMAGE_NAME:$DOCKER_IMAGE_VERSION'
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-
-//         stage('API Image Build & Push') {
-//             when {
-//                 expression {
-//                     return env.SHOULD_BUILD_FRONTEND == "true"
-//                 }
-//             }
-
-//             steps {
-//                 container('docker') {
-//                     dir('backend') {
-//                         script {
-//                             def buildNumber = "${env.BUILD_NUMBER}"
-
-//                             withEnv(["DOCKER_IMAGE_VERSION=${buildNumber}"]) {
-//                                 sh 'docker -v'
-//                                 sh 'echo $API_IMAGE_NAME:$DOCKER_IMAGE_VERSION'
-//                                 sh 'docker build --no-cache -t $API_IMAGE_NAME:$DOCKER_IMAGE_VERSION ./'
-//                                 sh 'docker image inspect $API_IMAGE_NAME:$DOCKER_IMAGE_VERSION'
-//                                 sh 'docker push $API_IMAGE_NAME:$DOCKER_IMAGE_VERSION'
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-
-//         stage('Trigger k8s-manifests') {
-//             steps {
-//                 script {
-//                     def buildNumber = "${env.BUILD_NUMBER}"
-
-//                     withEnv(["DOCKER_IMAGE_VERSION=${buildNumber}"]) {
-//                         build job: 'k8s',
-//                             parameters: [
-//                                 string(name: 'DOCKER_IMAGE_VERSION', value: "${DOCKER_IMAGE_VERSION}"),
-//                                 string(name: 'DID_BUILD_APP', value: "${env.SHOULD_BUILD_BACKEND}"),
-//                                 string(name: 'DID_BUILD_API', value: "${env.SHOULD_BUILD_FRONTEND}")
-//                             ],
-//                             wait: true
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
