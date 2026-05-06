@@ -170,9 +170,9 @@ controller:
 
   # Set min/max heap here if needed with "-Xms512m -Xmx512m"
   # -- Append to `JAVA_OPTS` env var
-  javaOpts: "-Duser.timezone=Asia/Seoul"
+  javaOpts:
   # -- Append to `JENKINS_OPTS` env var
-  jenkinsOpts:
+  jenkinsOpts: "-Duser.timezone=Asia/Seoul"
 
   # If you are using the ingress definitions provided by this chart via the `controller.ingress` block,
   # the configured hostname will be the ingress hostname starting with `https://`
@@ -239,11 +239,11 @@ controller:
   # -- k8s service clusterIP. Only used if serviceType is ClusterIP
   clusterIp:
   # -- k8s service port
-  servicePort: 8080
+  servicePort: 8085
   # -- k8s target port
-  targetPort: 8080
+  targetPort: 8085
   # -- k8s node port. Only used if serviceType is NodePort
-  nodePort: 30020
+  nodePort: 30022
 
   # Use Local to preserve the client source IP and avoids a second hop for LoadBalancer and NodePort type services,
   # but risks potentially imbalanced traffic spreading.

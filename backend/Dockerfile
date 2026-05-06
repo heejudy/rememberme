@@ -19,6 +19,6 @@ ARG BUILD_PROFILE=local
 ENV APP_PROFILE=${BUILD_PROFILE}
 ENV TZ=Asia/Seoul
 
-EXPOSE 8080
+EXPOSE 8085
 
 ENTRYPOINT ["sh", "-c", "java -jar app.jar --spring.profiles.active=${APP_PROFILE}"]
