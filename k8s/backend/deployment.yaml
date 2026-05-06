@@ -23,8 +23,6 @@ spec:
         envFrom:
           - configMapRef:
               name: backend-config
-          - secretRef:
-              name: backend-secret
         readinessProbe:
           httpGet:
             path: /actuator/health
