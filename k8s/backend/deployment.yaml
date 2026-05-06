@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: dndzhr/backend:4.0
+        image: dndzhr/backend:5.0
         env:
         - name: SPRING_DATASOURCE_URL
           value: "jdbc:mariadb://mariadb-deploy:3306/rememberv1" # DB 서비스 이름과 포트 확인
@@ -34,21 +34,27 @@ spec:
             cpu: "1000m"
         ports:
         - containerPort: 8085
-        # TCP 연결로 애플리케이션 시작 확인
+        # 컨테이너 안의 애플리케이션이 시작되었는지 확인한다.
         startupProbe:
-          tcpSocket:
+          httpGet:
+            path: /actuator/health
             port: 8085
+          # 실패를 허용하는 최대 횟수
           failureThreshold: 10
+          # 재요청 주기(10초마다 상태를 확인)
           periodSeconds: 10
-        # TCP 연결로 애플리케이션 상태 확인
+        # 컨테이너 안의 애플리케이션이 살아있는지 지속적으로 확인한다.
         livenessProbe:
-          tcpSocket:
+          httpGet:
+            path: /actuator/health/liveness
             port: 8085
+          # 최초 지연 시간
           initialDelaySeconds: 10
           periodSeconds: 20
-        # TCP 연결로 서비스 준비 확인
+        # 컨테이너 안의 애플리케이션이 실제로 서비스 요청에 응답할 수 있는지 확인한다.
         readinessProbe:
-          tcpSocket:
+          httpGet:
+            path: /actuator/health/readiness
             port: 8085
           initialDelaySeconds: 5
           periodSeconds: 5
