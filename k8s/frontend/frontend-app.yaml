@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: rememberme-frontend
+  name: frontend-app
   namespace: argocd 
 spec:
   project: default
