@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend-deploy
-  namespace: rememberme
+  namespace: default
   labels:
     app: backend
 spec:
