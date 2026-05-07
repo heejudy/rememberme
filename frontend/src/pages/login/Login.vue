@@ -9,7 +9,7 @@
         />
 
         <h1 class="text-3xl font-black text-[green] tracking-tight">
-          brainwalk
+          brain
         </h1>
         <p class="text-gray-500 text-sm font-medium">
           기억을 잇고, 건강을 걷다
