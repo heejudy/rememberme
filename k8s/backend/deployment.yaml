@@ -7,7 +7,7 @@ metadata:
     app: backend
 spec:
   replicas: 1
-  revisionHistoryLimit: 3  # 오래된 ReplicaSet 자동 정리 (최근 3개 유지)
+  revisionHistoryLimit: 3  
   selector:
     matchLabels:
       app: backend
@@ -24,7 +24,8 @@ spec:
         envFrom:
           - configMapRef:
               name: backend-config
-        # Readiness: 앱이 요청을 받을 준비가 되었는지 확인
+          - secretRef:
+              name: rememberme-backend-secret
         readinessProbe:
           httpGet:
             path: /actuator/health/readiness # 경로 세분화 권장

@@ -5,5 +5,3 @@ metadata:
   namespace: default
 data:
   SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb-service:3306/rememberv1
-  SPRING_DATASOURCE_USERNAME: rememberv1
-  SPRING_DATASOURCE_PASSWORD: "0000"
