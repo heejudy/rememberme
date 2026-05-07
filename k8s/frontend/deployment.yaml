@@ -18,6 +18,6 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: dndzhr/frontend:46
+          image: dndzhr/frontend:49
           ports:
             - containerPort: 85
