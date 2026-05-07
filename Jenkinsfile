@@ -27,10 +27,25 @@ pipeline {
         FRONT_IMAGE = 'dndzhr/frontend'
         BACK_IMAGE  = 'dndzhr/backend'
         DOCKER_CREDENTIALS_ID = 'dockerhub-access'
-        GIT_CREDENTIALS_ID = 'github-rememberme' // SSH key
+        GIT_CREDENTIALS_ID = 'github-rememberme'
+        GITOPS_REPO = 'git@github.com:rememberme/gitops.git'
     }
 
     stages {
+        stage('Get Version') {
+            steps {
+                script {
+                    def gitTag = sh(
+                        script: 'git describe --tags --exact-match HEAD 2>/dev/null || echo ""',
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.IMAGE_TAG = gitTag ?: env.BUILD_NUMBER
+                    echo "버전: ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
         stage('Detect Changes') {
             steps {
                 script {
@@ -77,19 +92,17 @@ pipeline {
             steps {
                 container('docker') {
                     script {
-                        def tag = env.BUILD_NUMBER
-
                         if (env.BUILD_BACK == "true") {
                             dir('backend') {
-                                sh "docker build -t ${BACK_IMAGE}:${tag} ."
-                                sh "docker push ${BACK_IMAGE}:${tag}"
+                                sh "docker build -t ${BACK_IMAGE}:${env.IMAGE_TAG} ."
+                                sh "docker push ${BACK_IMAGE}:${env.IMAGE_TAG}"
                             }
                         }
 
                         if (env.BUILD_FRONT == "true") {
                             dir('frontend') {
-                                sh "docker build -t ${FRONT_IMAGE}:${tag} ."
-                                sh "docker push ${FRONT_IMAGE}:${tag}"
+                                sh "docker build -t ${FRONT_IMAGE}:${env.IMAGE_TAG} ."
+                                sh "docker push ${FRONT_IMAGE}:${env.IMAGE_TAG}"
                             }
                         }
                     }
@@ -107,11 +120,11 @@ pipeline {
 
                     sh """
                     if [ "${env.BUILD_BACK}" = "true" ]; then
-                      sed -i 's|image: dndzhr/backend:.*|image: dndzhr/backend:${tag}|' k8s/backend/deployment.yaml
+                      sed -i 's|image: dndzhr/backend:.*|image: dndzhr/backend:${env.IMAGE_TAG}|' k8s/backend/deployment.yaml
                     fi
 
                     if [ "${env.BUILD_FRONT}" = "true" ]; then
-                      sed -i 's|image: dndzhr/frontend:.*|image: dndzhr/frontend:${tag}|' k8s/frontend/deployment.yaml
+                      sed -i 's|image: dndzhr/frontend:.*|image: dndzhr/frontend:${env.IMAGE_TAG}|' k8s/frontend/deployment.yaml
                     fi
                     """
 
@@ -119,11 +132,8 @@ pipeline {
                         sh """
                         git config user.email "jenkins@local"
                         git config user.name "jenkins"
-
-                        git add .
-                        git commit -m "update image tag to ${tag}" || true
-                        git push origin main
-                        """
+                        git add k8s/
+                        git commit -m "chore: update image tag to ${env.IMAGE_TAG
                     }
                 }
             }
