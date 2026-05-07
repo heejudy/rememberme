@@ -28,6 +28,7 @@ pipeline {
         BACK_IMAGE  = 'dndzhr/backend'
         DOCKER_CREDENTIALS_ID = 'dockerhub-access'
         GIT_CREDENTIALS_ID = 'github-rememberme'
+        // GitHub 주소 확인 (계정명/저장소명)
         GITOPS_REPO = 'git@github.com:heejudy/rememberme.git'
     }
 
@@ -35,13 +36,9 @@ pipeline {
         stage('Get Version') {
             steps {
                 script {
-                    def gitTag = sh(
-                        script: 'git describe --tags --exact-match HEAD 2>/dev/null || echo ""',
-                        returnStdout: true
-                    ).trim()
-                    
-                    env.IMAGE_TAG = gitTag ?: env.BUILD_NUMBER
-                    echo "버전: ${env.IMAGE_TAG}"
+                    // 빌드 번호를 태그로 사용하거나 Git Tag 사용
+                    env.IMAGE_TAG = env.BUILD_NUMBER
+                    echo "이번 빌드 버전: ${env.IMAGE_TAG}"
                 }
             }
         }
@@ -49,21 +46,18 @@ pipeline {
         stage('Detect Changes') {
             steps {
                 script {
-                    echo "변경 파일 확인 중..."
-
+                    echo "소스 코드 변경 파일 확인 중..."
+                    // 최근 1개 커밋의 변경 내역 확인
                     def changedFiles = sh(
-                        script: 'git diff --name-only HEAD~1 HEAD',
+                        script: 'git diff --name-only HEAD~1 HEAD || echo ""',
                         returnStdout: true
                     ).trim().split("\n")
 
                     env.BUILD_BACK  = changedFiles.any { it.startsWith("backend/") } ? "true" : "false"
                     env.BUILD_FRONT = changedFiles.any { it.startsWith("frontend/") } ? "true" : "false"
 
-                    if (env.BUILD_BACK == "false" && env.BUILD_FRONT == "false") {
-                        echo "변경 없음 → 종료"
-                        currentBuild.result = 'SUCCESS'
-                        return
-                    }
+                    echo "백엔드 빌드 여부: ${env.BUILD_BACK}"
+                    echo "프론트엔드 빌드 여부: ${env.BUILD_FRONT}"
                 }
             }
         }
@@ -92,16 +86,17 @@ pipeline {
             steps {
                 container('docker') {
                     script {
+                        // --no-cache 추가하여 소스 코드 변경이 확실히 이미지에 반영되도록 함
                         if (env.BUILD_BACK == "true") {
                             dir('backend') {
-                                sh "docker build -t ${BACK_IMAGE}:${env.IMAGE_TAG} ."
+                                sh "docker build --no-cache -t ${BACK_IMAGE}:${env.IMAGE_TAG} ."
                                 sh "docker push ${BACK_IMAGE}:${env.IMAGE_TAG}"
                             }
                         }
 
                         if (env.BUILD_FRONT == "true") {
                             dir('frontend') {
-                                sh "docker build -t ${FRONT_IMAGE}:${env.IMAGE_TAG} ."
+                                sh "docker build --no-cache -t ${FRONT_IMAGE}:${env.IMAGE_TAG} ."
                                 sh "docker push ${FRONT_IMAGE}:${env.IMAGE_TAG}"
                             }
                         }
@@ -116,35 +111,31 @@ pipeline {
             }
             steps {
                 script {
-                    // 1. 파일 수정 (패턴을 더 유연하게 잡고, 백업 파일 생성 방지)
+                    // 1. YAML 파일의 이미지 태그 수정
                     sh """
                     if [ "${env.BUILD_BACK}" = "true" ]; then
-                      echo "Backend YAML 수정 중: ${env.IMAGE_TAG}"
-                      # 공백에 상관없이 image: dndzhr/backend: 로 시작하는 줄 전체를 교체
+                      echo "Backend YAML 수정 (Tag: ${env.IMAGE_TAG})"
                       sed -i "s|image: dndzhr/backend:.*|image: dndzhr/backend:${env.IMAGE_TAG}|g" k8s/backend/deployment.yaml
                     fi
 
                     if [ "${env.BUILD_FRONT}" = "true" ]; then
-                      echo "Frontend YAML 수정 중: ${env.IMAGE_TAG}"
+                      echo "Frontend YAML 수정 (Tag: ${env.IMAGE_TAG})"
                       sed -i "s|image: dndzhr/frontend:.*|image: dndzhr/frontend:${env.IMAGE_TAG}|g" k8s/frontend/deployment.yaml
                     fi
                     """
 
-                    // 2. 수정된 내용 확인 (디버깅용 로그)
-                    sh "grep 'image:' k8s/backend/deployment.yaml || true"
-
-                    // 3. Git Push
+                    // 2. Git Push (Deploy Key 권한 확인 필수!)
                     sshagent(credentials: [GIT_CREDENTIALS_ID]) {
                         sh """
                         git config user.email "jenkins@local"
                         git config user.name "jenkins"
                         git add k8s/
-                        # 변경사항이 있을 때만 커밋 (에러 방지)
+                        
                         if ! git diff --cached --exit-code; then
                             git commit -m "chore: update image tag to ${env.IMAGE_TAG} [skip ci]"
                             git push ${GITOPS_REPO} HEAD:main
                         else
-                            echo "변경사항 없음"
+                            echo "YAML에 변경사항이 없습니다."
                         fi
                         """
                     }
@@ -155,10 +146,10 @@ pipeline {
 
     post {
         success {
-            echo "빌드 + 이미지 푸시 + YAML 업데이트 완료 (tag: ${env.BUILD_NUMBER})"
+            echo "✅ 배포 성공! '두뇌산책' 서비스에 ${env.IMAGE_TAG} 버전이 적용되었습니다."
         }
         failure {
-            echo "빌드 실패"
+            echo "❌ 빌드 실패. 로그를 확인해 주세요."
         }
     }
 }

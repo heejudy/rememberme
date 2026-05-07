@@ -206,4 +206,4 @@ yarn-error.log
 /application.yml
 /application-*.yml
 
-*/secret.yaml
+**/secret.yaml
