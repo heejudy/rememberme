@@ -28,7 +28,7 @@ pipeline {
         BACK_IMAGE  = 'dndzhr/backend'
         DOCKER_CREDENTIALS_ID = 'dockerhub-access'
         GIT_CREDENTIALS_ID = 'github-rememberme'
-        GITOPS_REPO = 'git@github.com:rememberme/gitops.git'
+        GITOPS_REPO = 'git@github.com:heejudy/rememberme.git'
     }
 
     stages {
