@@ -116,25 +116,36 @@ pipeline {
             }
             steps {
                 script {
-                    def tag = env.BUILD_NUMBER
-
+                    // 1. 파일 수정 (패턴을 더 유연하게 잡고, 백업 파일 생성 방지)
                     sh """
                     if [ "${env.BUILD_BACK}" = "true" ]; then
-                      sed -i 's|image: dndzhr/backend:.*|image: dndzhr/backend:${env.IMAGE_TAG}|' k8s/backend/deployment.yaml
+                      echo "Backend YAML 수정 중: ${env.IMAGE_TAG}"
+                      # 공백에 상관없이 image: dndzhr/backend: 로 시작하는 줄 전체를 교체
+                      sed -i "s|image: dndzhr/backend:.*|image: dndzhr/backend:${env.IMAGE_TAG}|g" k8s/backend/deployment.yaml
                     fi
 
                     if [ "${env.BUILD_FRONT}" = "true" ]; then
-                      sed -i 's|image: dndzhr/frontend:.*|image: dndzhr/frontend:${env.IMAGE_TAG}|' k8s/frontend/deployment.yaml
+                      echo "Frontend YAML 수정 중: ${env.IMAGE_TAG}"
+                      sed -i "s|image: dndzhr/frontend:.*|image: dndzhr/frontend:${env.IMAGE_TAG}|g" k8s/frontend/deployment.yaml
                     fi
                     """
 
+                    // 2. 수정된 내용 확인 (디버깅용 로그)
+                    sh "grep 'image:' k8s/backend/deployment.yaml || true"
+
+                    // 3. Git Push
                     sshagent(credentials: [GIT_CREDENTIALS_ID]) {
                         sh """
                         git config user.email "jenkins@local"
                         git config user.name "jenkins"
                         git add k8s/
-                        git commit -m "chore: update image tag to ${env.IMAGE_TAG}"
-                        git push ${GITOPS_REPO} HEAD:main
+                        # 변경사항이 있을 때만 커밋 (에러 방지)
+                        if ! git diff --cached --exit-code; then
+                            git commit -m "chore: update image tag to ${env.IMAGE_TAG} [skip ci]"
+                            git push ${GITOPS_REPO} HEAD:main
+                        else
+                            echo "변경사항 없음"
+                        fi
                         """
                     }
                 }
