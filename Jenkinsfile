@@ -28,7 +28,6 @@ pipeline {
         BACK_IMAGE  = 'dndzhr/backend'
         DOCKER_CREDENTIALS_ID = 'dockerhub-access'
         GIT_CREDENTIALS_ID = 'github-rememberme'
-        // GitHub 주소 확인 (계정명/저장소명)
         GITOPS_REPO = 'git@github.com:heejudy/rememberme.git'
     }
 
