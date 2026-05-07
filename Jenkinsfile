@@ -133,7 +133,9 @@ pipeline {
                         git config user.email "jenkins@local"
                         git config user.name "jenkins"
                         git add k8s/
-                        git commit -m "chore: update image tag to ${env.IMAGE_TAG
+                        git commit -m "chore: update image tag to ${env.IMAGE_TAG}"
+                        git push ${GITOPS_REPO} HEAD:main
+                        """
                     }
                 }
             }
