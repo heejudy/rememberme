@@ -24,7 +24,7 @@ spec:
           - containerPort: 8085
         envFrom:
           - secretRef:
-              name: rememberme-backend-secret
+              name: backend-secret
         readinessProbe:
           httpGet:
             path: /actuator/health/readiness # 경로 세분화 권장
